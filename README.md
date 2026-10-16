@@ -119,7 +119,3 @@ Analysis on top of it lives in the sibling project `Sports-Tracking-Toolkit`:
 continuous ball paths, jersey-colour team assignment, match events, possession
 and label-free quality scoring. That project also documents, with measurements,
 which footage this class of pipeline handles and which it does not.
-
-If only one of the two can be maintained, keep the sports toolkit. The useful
-surface of this repository is a subset of it. `../SUBMISSION.md` lists what
-belongs in each repository when publishing.
