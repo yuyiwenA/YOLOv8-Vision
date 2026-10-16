@@ -1,65 +1,48 @@
-import cv2
-import pandas as pd
-from ultralytics import YOLO
+"""YOLOv8-Vision: detection pipeline entry point.
 
-def main(video_path, output_video="result.mp4", output_csv="trajectory.csv"):
-    model = YOLO("yolov8n.pt")
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        print("Error: Cannot open video")
-        return
+Command line (recommended)::
 
-    fps = cap.get(cv2.CAP_PROP_FPS)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    python main.py                       # auto-detects the video in this folder
+    python main.py --video test_video.mp4 --track
+    python main.py --help
 
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
+Programmatic use (backward compatible with the original script's signature)::
 
-    trajectory_records = []
-    frame_id = 0
-    print(f"Processing video, total frames: {total_frames}")
+    from main import main
+    main("test_video.mp4", output_video="result.mp4", output_csv="trajectory.csv")
+"""
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        results = model(frame, verbose=False)
-        for result in results:
-            boxes = result.boxes
-            for box in boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                conf = float(box.conf[0])
-                cls_id = int(box.cls[0])
-                cls_name = result.names[cls_id]
+import os
+import sys
 
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                cv2.putText(frame, f"{cls_name} {conf:.2f}",
-                            (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-                trajectory_records.append({
-                    "frame_id": frame_id,
-                    "class": cls_name,
-                    "confidence": conf,
-                    "x1": x1, "y1": y1,
-                    "x2": x2, "y2": y2
-                })
-        out.write(frame)
-        frame_id += 1
-        if frame_id % 30 == 0:
-            print(f"Processed {frame_id}/{total_frames} frames")
+from vision.pipeline import build_parser, run  # noqa: E402
 
-    cap.release()
-    out.release()
-    cv2.destroyAllWindows()
 
-    df = pd.DataFrame(trajectory_records)
-    df.to_csv(output_csv, index=False)
-    print(f"Done! Result video saved to {output_video}")
-    print(f"Trajectory data saved to {output_csv}")
+def main(video_path=None, output_video=None, output_csv=None):
+    """Legacy-compatible wrapper around :func:`vision.pipeline.run`.
+
+    ``video_path``, ``output_video`` and ``output_csv`` mirror the parameters of
+    the original monolithic script, but every option is now available through
+    the command line as well.
+    """
+    args = build_parser().parse_args([])
+    if video_path is not None:
+        args.video = video_path
+
+    out_dir = args.out
+    video_name, csv_name = "result.mp4", "trajectory.csv"
+    if output_video:
+        out_dir = os.path.dirname(os.path.abspath(output_video)) or out_dir
+        video_name = os.path.basename(output_video)
+    if output_csv:
+        out_dir = os.path.dirname(os.path.abspath(output_csv)) or out_dir
+        csv_name = os.path.basename(output_csv)
+    args.out = out_dir
+
+    return run(args, video_name=video_name, csv_name=csv_name)
+
 
 if __name__ == "__main__":
-    VIDEO_PATH = "test_video.mp4"
-    main(VIDEO_PATH)
+    raise SystemExit(run(build_parser().parse_args()))
